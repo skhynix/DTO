@@ -71,6 +71,66 @@ Following environment variables control the behavior of DTO library:
 	DTO_LOG_LEVEL=0/1/2 controls the log level. higher value means more verbose logging (default 0).
 ```
 
+## Using dtoctl
+
+Setting `LD_PRELOAD` and exporting the `DTO_*` environment variables by hand is
+error prone. The `dtoctl` tool provides a simpler interface: it takes the DTO
+settings as command line options, converts them to the corresponding `DTO_*`
+environment variables, prepends `libdto.so` to `LD_PRELOAD`, and then runs the
+target program. See `doc/dtoctl.md` for the full manual.
+
+For example, instead of
+
+```bash
+export LD_PRELOAD=/usr/lib64/libdto.so
+export DTO_WAIT_METHOD=busypoll
+export DTO_CPU_SIZE_FRACTION=0.33
+export DTO_AUTO_ADJUST_KNOBS=1
+./prog
+```
+
+you can run
+
+```bash
+dtoctl -w busypoll -c 0.33 ./prog
+```
+
+`dtoctl` only applies the options you pass; any `DTO_*` variable you already
+exported is left untouched, and an explicit option overrides it. The `libdto.so`
+path is resolved from `-l/--library`, then `$DTO_LIBRARY`, then the compiled-in
+default (`/usr/lib64/libdto.so`), and is prepended to any existing `LD_PRELOAD`.
+
+Option to environment variable mapping:
+
+| Option | Environment variable | Default |
+| --- | --- | --- |
+| `-l, --library=PATH` | (prepended to `LD_PRELOAD`) | `/usr/lib64/libdto.so` |
+| `-w, --wait-method=METHOD` | `DTO_WAIT_METHOD` | `busypoll` |
+| `-b, --min-bytes=BYTES` | `DTO_MIN_BYTES` | `65536` |
+| `-c, --cpu-fraction=FRACTION` | `DTO_CPU_SIZE_FRACTION` | `0.0` |
+| `-n, --numa-aware=MODE` | `DTO_IS_NUMA_AWARE` | `0` (disabled) |
+| `-q, --wq-list=LIST` | `DTO_WQ_LIST` | auto-discover all WQs |
+| `--umwait-delay=CYCLES` | `DTO_UMWAIT_DELAY` | `100000` |
+| `--overlapping-memmove=cpu\|dsa` | `DTO_OVERLAPPING_MEMMOVE_ACTION` | `cpu` |
+| `--no-memcpy` | `DTO_DSA_MEMCPY=0` | use DSA |
+| `--no-memmove` | `DTO_DSA_MEMMOVE=0` | use DSA |
+| `--no-memset` | `DTO_DSA_MEMSET=0` | use DSA |
+| `--no-memcmp` | `DTO_DSA_MEMCMP=0` | use DSA |
+| `--no-cache-control` | `DTO_DSA_CC=0` | cache control on |
+| `--no-auto-adjust` | `DTO_AUTO_ADJUST_KNOBS=0` | auto tuning on |
+| `--stdc-only` | `DTO_USESTDC_CALLS=1` | DSA offload on |
+| `--stats` | `DTO_COLLECT_STATS=1` | off |
+| `--stats-file=PATH` | `DTO_STATS_FILE` | standard output |
+| `--log-file=PATH` | `DTO_LOG_FILE` | standard output |
+| `--log-level=LEVEL` | `DTO_LOG_LEVEL` | `0` |
+
+Build and install it with:
+
+```bash
+make dtoctl
+make install   # installs dtoctl to /usr/bin along with libdto.so
+```
+
 Although not the only usage models of DTO, the following are some common ones:
    Latency reduction - the goal is to minimize the latency of offloaded operations. Use the following settings:
       DTO_AUTO_ADJUST_KNOBS=1 (the CPU fraction setting is critical to this mode. The optimal value is dynamic so autotune algorithm needs to be enabled) 
@@ -105,6 +165,7 @@ On Ubuntu/Debian: linux-libc-dev, libaccel-config-dev, uuid-dev, libnuma-dev
 
 ```bash
 make libdto
+make dtoctl
 make install
 ```
 
